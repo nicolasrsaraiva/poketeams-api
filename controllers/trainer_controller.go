@@ -27,7 +27,7 @@ func CreateTrainer(w http.ResponseWriter, r *http.Request) {
 	db := database.ConnectDB()
 	defer db.Close()
 
-	stmt, err := db.Prepare("INSERT INTO trainer (name, region) VALUES ($1, $2)")
+	stmt, err := db.Prepare("INSERT INTO trainers (name, region) VALUES ($1, $2)")
 	if err != nil {
 		log.Fatalf("Error preparing SQL statement: %s", err)
 		return
@@ -38,6 +38,7 @@ func CreateTrainer(w http.ResponseWriter, r *http.Request) {
 		log.Fatalf("Error executing SQL statement: %s", err)
 		return
 	}
+	w.WriteHeader(http.StatusCreated)
 }
 
 func GetTrainer(w http.ResponseWriter, r *http.Request) {
@@ -71,7 +72,7 @@ func GetTrainers(w http.ResponseWriter, r *http.Request) {
 	db := database.ConnectDB()
 	defer db.Close()
 
-	stmt, err := db.Prepare("SELECT * FROM trainer")
+	stmt, err := db.Prepare("SELECT * FROM trainers")
 	if err != nil {
 		http.Error(w, "Error in SQL statement prepare", http.StatusInternalServerError)
 		return
@@ -81,6 +82,7 @@ func GetTrainers(w http.ResponseWriter, r *http.Request) {
 	rows, err := stmt.Query()
 	if err != nil {
 		http.Error(w, "Error in SQL query execution", http.StatusInternalServerError)
+		return
 	}
 	defer rows.Close()
 
@@ -88,10 +90,11 @@ func GetTrainers(w http.ResponseWriter, r *http.Request) {
 
 	for rows.Next() {
 		var trainer models.Trainer
-		err := rows.Scan(&trainer.Id, &trainer.Name, &trainer.Region)
+		err := rows.Scan(&trainer.Id, &trainer.Name, &trainer.Region, &trainer.PokemonsId)
 
 		if err != nil {
 			http.Error(w, "Error while scanning row", http.StatusInternalServerError)
+			return
 		}
 
 		trainers = append(trainers, trainer)
@@ -100,7 +103,7 @@ func GetTrainers(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "Error while encoding json", http.StatusInternalServerError)
 	}
-	w.Header().Set("Content-Type", "application/json")
+	//w.Header().Set("Content-Type", "application/json")
 	w.Write(responseJson)
 }
 
@@ -108,7 +111,7 @@ func getTrainerByID(id int) (*models.Trainer, error) {
 	db := database.ConnectDB()
 	defer db.Close()
 
-	stmt, err := db.Prepare("SELECT * FROM trainer WHERE ID=$1")
+	stmt, err := db.Prepare("SELECT * FROM trainers WHERE ID=$1")
 	if err != nil {
 		log.Fatalf("Error preparing SQL statement: %s", err)
 	}
@@ -116,7 +119,7 @@ func getTrainerByID(id int) (*models.Trainer, error) {
 	var trainer models.Trainer
 	row := stmt.QueryRow(id)
 
-	err = row.Scan(&trainer.Id, &trainer.Name, &trainer.Region)
+	err = row.Scan(&trainer.Id, &trainer.Name, &trainer.Region, &trainer.PokemonsId)
 
 	if err != nil {
 		return nil, err
@@ -125,7 +128,7 @@ func getTrainerByID(id int) (*models.Trainer, error) {
 	return &trainer, err
 }
 
-func CreateTeam(w http.ResponseWriter, r *http.Request) { //incomplete
+func CreateTeamIncomplete(w http.ResponseWriter, r *http.Request) { //incomplete
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -174,4 +177,44 @@ func CreateTeam(w http.ResponseWriter, r *http.Request) { //incomplete
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(responseJson)
+}
+
+func CreateTeam(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	db := database.ConnectDB()
+	defer db.Close()
+
+	var idPokemons [6]int
+	err := json.NewDecoder(r.Body).Decode(&idPokemons)
+
+	if err != nil {
+		http.Error(w, "Error decoding json", http.StatusInternalServerError)
+		return
+	}
+
+	for _, id := range idPokemons {
+		if id <= 0 || id > 20 {
+			http.Error(w, "Pokemons doesnt exists", http.StatusBadRequest)
+		}
+	}
+
+	idTrainer := r.URL.Query().Get("id")
+
+	stmt, err := db.Prepare("UPDATE trainers SET team = ARRAY[$1, $2, $3, $4, $5, $6] where id=$7")
+	if err != nil {
+		http.Error(w, "Error in prepare sql statement", http.StatusInternalServerError)
+		return
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(idPokemons[0], idPokemons[1], idPokemons[2], idPokemons[3], idPokemons[4], idPokemons[5], idTrainer)
+	if err != nil {
+		http.Error(w, "Error in sql execution", http.StatusInternalServerError)
+		return
+	}
+
 }

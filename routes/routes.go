@@ -12,11 +12,12 @@ func TrainerHandleRequests() {
 	http.HandleFunc("/trainer", controllers.CreateTrainer)
 	http.HandleFunc("/trainer/", controllers.GetTrainer)
 	http.HandleFunc("/trainers", controllers.GetTrainers)
-	http.HandleFunc("/trainer/create-team", controllers.CreateTeam)
+	http.HandleFunc("/trainer/id/team/", controllers.CreateTeam)
 }
 
 func PokemonHandleRequests() {
 	fmt.Println("Rotas de pokemon iniciadas")
 	http.HandleFunc("/pokemon/name/", controllers.GetPokemonByName)
 	http.HandleFunc("/pokemon/id/", controllers.GetPokemonById)
+	http.HandleFunc("/pokemons/", controllers.GetPokemons)
 }

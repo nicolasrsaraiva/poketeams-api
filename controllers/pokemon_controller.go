@@ -46,6 +46,7 @@ func GetPokemonByName(w http.ResponseWriter, r *http.Request) {
 func GetPokemonById(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
 	}
 
 	id := r.URL.Query().Get("id")
@@ -53,6 +54,7 @@ func GetPokemonById(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		http.Error(w, "Error in pokemon id", http.StatusBadRequest)
+		return
 	}
 
 	db := database.ConnectDB()
@@ -61,6 +63,7 @@ func GetPokemonById(w http.ResponseWriter, r *http.Request) {
 	stmt, err := db.Prepare("SELECT * FROM pokemons WHERE ID=$1")
 	if err != nil {
 		http.Error(w, "Error in query select", http.StatusInternalServerError)
+		return
 	}
 	defer stmt.Close()
 
@@ -72,12 +75,54 @@ func GetPokemonById(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		http.Error(w, "Error in pokemon scan", http.StatusInternalServerError)
+		return
 	}
 
 	err = json.NewEncoder(w).Encode(pokemon)
 	if err != nil {
 		http.Error(w, "Error in pokemon encoding", http.StatusInternalServerError)
+		return
+	}
+}
+
+func GetPokemons(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	db := database.ConnectDB()
+	defer db.Close()
+
+	stmt, err := db.Prepare("SELECT * FROM pokemons")
+	if err != nil {
+		http.Error(w, "Error in SQL statement", http.StatusInternalServerError)
+		return
+	}
+	defer stmt.Close()
+
+	var pokemons []models.Pokemon
+
+	rows, err := stmt.Query()
+	if err != nil {
+		http.Error(w, "Error in SQL Query", http.StatusInternalServerError)
+		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	for rows.Next() {
+		var pokemon models.Pokemon
+		err := rows.Scan(&pokemon.Id, &pokemon.Name, &pokemon.Hp, &pokemon.Def, &pokemon.Defm, &pokemon.Atk, &pokemon.Spatk, &pokemon.Speed)
+		if err != nil {
+			http.Error(w, "Error in SQL Scan", http.StatusInternalServerError)
+			return
+		}
+		pokemons = append(pokemons, pokemon)
+	}
+
+	responseJson, err := json.Marshal(pokemons)
+	if err != nil {
+		http.Error(w, "Error while encoding json", http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(responseJson)
 }
